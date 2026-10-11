@@ -333,12 +333,13 @@ patch_scripts_and_vmoptions() {
 export DISPLAY="${DISPLAY:-:0}"
 export GDK_BACKEND=x11
 unset LD_PRELOAD
-if [ -z "${STUDIO_JDK:-}" ] && [ -d "/data/data/com.termux/files/usr/lib/jvm/openjdk-25" ]; then
-    export STUDIO_JDK="/data/data/com.termux/files/usr/lib/jvm/openjdk-25"
-elif [ -z "${STUDIO_JDK:-}" ] && [ -d "/data/data/com.termux/files/usr/lib/jvm/openjdk-21" ]; then
-    export STUDIO_JDK="/data/data/com.termux/files/usr/lib/jvm/openjdk-21"
-elif [ -z "${STUDIO_JDK:-}" ] && [ -d "/data/data/com.termux/files/usr/lib/jvm/openjdk-17" ]; then
-    export STUDIO_JDK="/data/data/com.termux/files/usr/lib/jvm/openjdk-17"
+if [ -z "${STUDIO_JDK:-}" ]; then
+    for _jdk in "java-25-openjdk" "openjdk-25" "java-21-openjdk" "openjdk-21" "java-17-openjdk" "openjdk-17"; do
+        if [ -d "/data/data/com.termux/files/usr/lib/jvm/${_jdk}" ]; then
+            export STUDIO_JDK="/data/data/com.termux/files/usr/lib/jvm/${_jdk}"
+            break
+        fi
+    done
 fi
 export LD_LIBRARY_PATH="/system/lib64:/data/data/com.termux/files/usr/lib:$IDE_HOME/lib/skiko:$IDE_HOME/lib/sqlite/linux-aarch64:${LD_LIBRARY_PATH:-}"
 # <<< STUDIO_BIONIC_PATCHED <<<
