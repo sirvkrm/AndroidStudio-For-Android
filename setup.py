@@ -301,35 +301,85 @@ class Installer:
 
         print_success(f"Android Studio extracted successfully to: {self.studio_dir}")
 
+    def detect_required_java(self):
+        try:
+            for jar_path in (self.studio_dir / "lib").glob("*.jar"):
+                try:
+                    with zipfile.ZipFile(jar_path, 'r') as z:
+                        for name in z.namelist():
+                            if name.endswith('.class') and not name.startswith('META-INF/'):
+                                with z.open(name) as f:
+                                    magic = f.read(4)
+                                    if magic == b'\xca\xfe\xba\xbe':
+                                        f.read(2)
+                                        major = int.from_bytes(f.read(2), 'big')
+                                        if major >= 45:
+                                            return major - 44
+                except Exception:
+                    continue
+        except Exception:
+            pass
+        return 21
+
+    def get_jdk_version(self, jdk_path):
+        try:
+            java_bin = jdk_path / "bin" / "java"
+            res = subprocess.run([str(java_bin), "-version"], capture_output=True, text=True)
+            out = res.stderr or res.stdout
+            m = re.search(r'version "(\d+)', out)
+            if m:
+                return int(m.group(1))
+        except Exception:
+            pass
+        m = re.search(r'(\d+)', jdk_path.name)
+        if m:
+            return int(m.group(1))
+        return 17
+
     def step_setup_jdk(self):
         print_step("Step 2: Native OpenJDK Setup (No PRoot needed!)")
 
-        candidates = []
-        search_dirs = [
-            self.termux_prefix / "lib" / "jvm",
-            Path("/usr/lib/jvm")
-        ]
-        
-        for sdir in search_dirs:
-            if sdir.exists():
-                for d in sdir.glob("*"):
-                    if (d / "bin" / "java").exists():
-                        candidates.append(d)
+        req_ver = self.detect_required_java()
+        print_info(f"Android Studio bytecode requires Java {req_ver}+ (class file version {req_ver + 44}.0)")
 
-        if not candidates and self.is_termux:
-            print_warn("No native OpenJDK found in Termux.")
-            if ask_yes_no("Install native OpenJDK 17 now via 'pkg install openjdk-17'?", default=True):
-                subprocess.run(["pkg", "install", "-y", "openjdk-17"], check=False)
-                # Re-scan
-                for d in (self.termux_prefix / "lib" / "jvm").glob("*"):
-                    if (d / "bin" / "java").exists():
-                        candidates.append(d)
+        def find_candidates():
+            found = []
+            search_dirs = [
+                self.termux_prefix / "lib" / "jvm",
+                Path("/usr/lib/jvm")
+            ]
+            for sdir in search_dirs:
+                if sdir.exists():
+                    for d in sdir.glob("*"):
+                        if (d / "bin" / "java").exists():
+                            found.append(d)
+            return found
+
+        candidates = find_candidates()
+        compatible = [c for c in candidates if self.get_jdk_version(c) >= req_ver]
+
+        if not compatible and self.is_termux:
+            pkg_name = f"openjdk-{req_ver}"
+            print_warn(f"No Java {req_ver}+ found in Termux. Detected JDKs: {[c.name for c in candidates] or 'none'}.")
+            if ask_yes_no(f"Install native {pkg_name} now via 'pkg install {pkg_name}'?", default=True):
+                subprocess.run(["pkg", "install", "-y", pkg_name], check=False)
+                candidates = find_candidates()
+                compatible = [c for c in candidates if self.get_jdk_version(c) >= req_ver]
 
         if candidates:
-            jdk_opts = [(c.name, str(c)) for c in candidates]
+            # Sort with compatible JDKs first
+            candidates.sort(key=lambda c: (self.get_jdk_version(c) >= req_ver, self.get_jdk_version(c)), reverse=True)
+            jdk_opts = [
+                (f"{c.name} (Java {self.get_jdk_version(c)})" + (" ✔ Compatible" if self.get_jdk_version(c) >= req_ver else " ⚠ Incompatible"), str(c))
+                for c in candidates
+            ]
             c_idx = ask_choice("Select Native JDK to power Android Studio:", jdk_opts, default=1)
             self.selected_jdk = candidates[c_idx]
-            print_success(f"Selected JDK: {self.selected_jdk}")
+            sel_ver = self.get_jdk_version(self.selected_jdk)
+            if sel_ver < req_ver:
+                print_warn(f"Selected JDK (Java {sel_ver}) is older than required (Java {req_ver})! Studio may throw UnsupportedClassVersionError.")
+            else:
+                print_success(f"Selected JDK: {self.selected_jdk} (Java {sel_ver})")
         else:
             print_warn("Could not locate OpenJDK automatically. Studio will use system PATH java if set.")
 
@@ -524,6 +574,8 @@ set -e
 export DISPLAY="${{DISPLAY:-:0}}"
 export GDK_BACKEND=x11
 unset LD_PRELOAD
+export STUDIO_JDK="{self.selected_jdk}"
+export JAVA_HOME="{self.selected_jdk}"
 
 export ANDROID_HOME="{self.sdk_dir}"
 export ANDROID_SDK_ROOT="{self.sdk_dir}"

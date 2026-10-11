@@ -333,10 +333,12 @@ patch_scripts_and_vmoptions() {
 export DISPLAY="${DISPLAY:-:0}"
 export GDK_BACKEND=x11
 unset LD_PRELOAD
-if [ -z "${STUDIO_JDK:-}" ] && [ -d "/data/data/com.termux/files/usr/lib/jvm/openjdk-17" ]; then
-    export STUDIO_JDK="/data/data/com.termux/files/usr/lib/jvm/openjdk-17"
+if [ -z "${STUDIO_JDK:-}" ] && [ -d "/data/data/com.termux/files/usr/lib/jvm/openjdk-25" ]; then
+    export STUDIO_JDK="/data/data/com.termux/files/usr/lib/jvm/openjdk-25"
 elif [ -z "${STUDIO_JDK:-}" ] && [ -d "/data/data/com.termux/files/usr/lib/jvm/openjdk-21" ]; then
     export STUDIO_JDK="/data/data/com.termux/files/usr/lib/jvm/openjdk-21"
+elif [ -z "${STUDIO_JDK:-}" ] && [ -d "/data/data/com.termux/files/usr/lib/jvm/openjdk-17" ]; then
+    export STUDIO_JDK="/data/data/com.termux/files/usr/lib/jvm/openjdk-17"
 fi
 export LD_LIBRARY_PATH="/system/lib64:/data/data/com.termux/files/usr/lib:$IDE_HOME/lib/skiko:$IDE_HOME/lib/sqlite/linux-aarch64:${LD_LIBRARY_PATH:-}"
 # <<< STUDIO_BIONIC_PATCHED <<<
@@ -458,6 +460,10 @@ set -e
 export DISPLAY="\${DISPLAY:-:0}"
 export GDK_BACKEND=x11
 unset LD_PRELOAD
+if [ -n "${SELECTED_JDK:-}" ]; then
+    export STUDIO_JDK="$SELECTED_JDK"
+    export JAVA_HOME="$SELECTED_JDK"
+fi
 
 export ANDROID_HOME="$SDK_ROOT"
 export ANDROID_SDK_ROOT="$SDK_ROOT"
