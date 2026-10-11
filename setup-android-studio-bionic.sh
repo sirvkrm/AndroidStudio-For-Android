@@ -24,8 +24,8 @@ SDK_36_URL="https://github.com/HomuHomu833/android-sdk-custom/releases/download/
 NDK_R29_URL="https://github.com/HomuHomu833/android-ndk-custom/releases/download/r29/android-ndk-r29-beta4-aarch64-linux-android.tar.xz"
 NDK_VERSION_DIR="29.0.14033849"
 
-# Official Android Studio Linux ARM64 (Fallback download)
-STUDIO_DOWNLOAD_URL="https://redirector.gvt1.com/edgedl/android/studio/ide-zips/2024.3.1.13/android-studio-2024.3.1.13-linux.tar.gz"
+# Official Android Studio Linux ARM64 (Latest Stable Rabbit 1)
+STUDIO_DOWNLOAD_URL="https://edgedl.me.gvt1.com/android/studio/ide-zips/2026.2.1.8/android-studio-rabbit1-linux.tar.gz"
 
 # Dry run flag
 DRY_RUN="no"

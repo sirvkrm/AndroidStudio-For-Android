@@ -15,7 +15,15 @@ import tarfile
 import zipfile
 import urllib.request
 import subprocess
+import re
 from pathlib import Path
+
+# Ensure stdin reads from the terminal keyboard even when executed via `curl ... | bash`
+if not sys.stdin.isatty():
+    try:
+        sys.stdin = open("/dev/tty", "r")
+    except Exception:
+        pass
 
 # ANSI Terminal Colors
 class C:
@@ -92,6 +100,9 @@ def download_with_progress(url, dest_path):
     print_info(f"Downloading: {url}")
     print_info(f"Destination: {dest_path}")
     
+    headers = {"User-Agent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36"}
+    req = urllib.request.Request(url, headers=headers)
+
     def reporthook(blocknum, blocksize, totalsize):
         read = blocknum * blocksize
         if totalsize > 0:
@@ -109,7 +120,17 @@ def download_with_progress(url, dest_path):
             sys.stdout.flush()
 
     try:
-        urllib.request.urlretrieve(url, dest_path, reporthook=reporthook)
+        with urllib.request.urlopen(req) as resp, open(dest_path, "wb") as out_file:
+            totalsize = int(resp.headers.get("Content-Length", 0))
+            blocksize = 64 * 1024
+            blocknum = 0
+            while True:
+                chunk = resp.read(blocksize)
+                if not chunk:
+                    break
+                out_file.write(chunk)
+                blocknum += 1
+                reporthook(blocknum, blocksize, totalsize)
         print()
         print_success(f"Download completed: {dest_path}")
     except Exception as e:
@@ -117,22 +138,48 @@ def download_with_progress(url, dest_path):
         print_error(f"Download failed: {e}")
         raise
 
-# Known Android Studio Linux Official Builds
+def fetch_live_google_release_url():
+    """Scrapes developer.android.com/studio for the latest official Linux download link"""
+    try:
+        req = urllib.request.Request(
+            "https://developer.android.com/studio",
+            headers={"User-Agent": "Mozilla/5.0 (X11; Linux x86_64)"}
+        )
+        with urllib.request.urlopen(req, timeout=6) as resp:
+            html = resp.read().decode('utf-8', errors='ignore')
+            m = re.search(r'https://[^\s"\']*linux\.tar\.gz', html)
+            if m:
+                return m.group(0)
+    except Exception:
+        pass
+    return "https://edgedl.me.gvt1.com/android/studio/ide-zips/2026.2.1.8/android-studio-rabbit1-linux.tar.gz"
+
+# Available Android Studio Linux Releases
 STUDIO_RELEASES = [
     (
-        "Android Studio Ladybug (2024.2.1.12 - Recommended Stable)",
-        "Official Linux ARM64 / aarch64 compatible release archive",
+        "Android Studio Rabbit 1 (2026.2.1.8 - Latest Official Stable)",
+        "The current newest official Google Android Studio stable release for Linux",
+        "https://edgedl.me.gvt1.com/android/studio/ide-zips/2026.2.1.8/android-studio-rabbit1-linux.tar.gz"
+    ),
+    (
+        "Android Studio Rabbit 2 Canary 4 (2026.2.2.4 - Latest Canary Preview)",
+        "Cutting-edge Canary preview with experimental Kotlin & Jetpack tools",
+        "https://edgedl.me.gvt1.com/android/studio/ide-zips/2026.2.2.4/android-studio-rabbit2-canary4-linux.tar.gz"
+    ),
+    (
+        "Android Studio Ladybug (2024.2.1.12 - Proven Classic Stable)",
+        "Previous generation rock-solid long-term stable release",
         "https://redirector.gvt1.com/edgedl/android/studio/ide-zips/2024.2.1.12/android-studio-2024.2.1.12-linux.tar.gz"
     ),
     (
-        "Android Studio Meerkat (2024.3.1.13 Canary)",
-        "Cutting-edge Canary build with latest IntelliJ 2024.3 platform",
-        "https://redirector.gvt1.com/edgedl/android/studio/ide-zips/2024.3.1.13/android-studio-2024.3.1.13-linux.tar.gz"
+        "Android Studio Koala Feature Drop (2024.1.2.12 - Lightweight)",
+        "Lightweight release with minimal resource and memory footprint",
+        "https://redirector.gvt1.com/edgedl/android/studio/ide-zips/2024.1.2.12/android-studio-2024.1.2.12-linux.tar.gz"
     ),
     (
-        "Android Studio Koala Feature Drop (2024.1.2.12)",
-        "Proven, lightweight release with excellent battery & RAM profile",
-        "https://redirector.gvt1.com/edgedl/android/studio/ide-zips/2024.1.2.12/android-studio-2024.1.2.12-linux.tar.gz"
+        "Fetch Live Latest Directly from Google (developer.android.com)",
+        "Auto-queries Google's site for whatever newest release is published right now",
+        "__AUTO_LIVE__"
     ),
     (
         "Custom URL",
@@ -146,7 +193,7 @@ STUDIO_RELEASES = [
     ),
 ]
 
-# URLs for components
+# URLs for Bionic components
 BIONIC_LIBS_TARBALL_URL = "https://github.com/sirvkrm/AndroidStudio-Bionic-Libs/releases/download/v1.0.0/android-studio-bionic-libs-aarch64.tar.gz"
 SDK_35_URL = "https://github.com/HomuHomu833/android-sdk-custom/releases/download/35.0.2/android-sdk-aarch64-linux-musl.tar.xz"
 SDK_36_URL = "https://github.com/HomuHomu833/android-sdk-custom/releases/download/36.0.0/android-sdk-aarch64-linux-musl.tar.xz"
@@ -210,8 +257,8 @@ class Installer:
         
         _, _, release_url = STUDIO_RELEASES[choice_idx]
         
+        # Skip download
         if choice_idx == len(STUDIO_RELEASES) - 1:
-            # Skip download, prompt path
             while True:
                 p = input("Enter path to your existing Android Studio folder: ").strip()
                 target = Path(p).expanduser().resolve()
@@ -221,9 +268,15 @@ class Installer:
                     return
                 print_error(f"Path does not exist: {target}. Please try again.")
 
+        # Custom URL
         if choice_idx == len(STUDIO_RELEASES) - 2:
-            # Custom URL
             release_url = input("Enter custom direct download URL for Android Studio .tar.gz: ").strip()
+
+        # Auto live fetch
+        if release_url == "__AUTO_LIVE__":
+            print_info("Querying Google for latest live Linux download link...")
+            release_url = fetch_live_google_release_url()
+            print_success(f"Fetched latest URL: {release_url}")
 
         # Download & Extract
         dest_archive = self.home / "android-studio-download.tar.gz"
@@ -236,8 +289,16 @@ class Installer:
         if dest_archive.exists():
             dest_archive.unlink()
 
-        # Studio extracts to 'android-studio' by default
-        self.studio_dir = self.home / "android-studio"
+        # Resilient detection of extracted folder
+        if (self.home / "android-studio" / "bin" / "studio.sh").exists():
+            self.studio_dir = self.home / "android-studio"
+        else:
+            candidates = list(self.home.glob("android-studio*"))
+            for c in candidates:
+                if (c / "bin" / "studio.sh").exists():
+                    self.studio_dir = c
+                    break
+
         print_success(f"Android Studio extracted successfully to: {self.studio_dir}")
 
     def step_setup_jdk(self):
