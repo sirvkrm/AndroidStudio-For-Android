@@ -444,9 +444,23 @@ class Installer:
             shutil.rmtree(skiko_cache, ignore_errors=True)
             print_success("Purged stale ~/.skiko cache")
 
-        # Inject libjnidispatch.so into jar files
+        # Inject libjnidispatch.so into jna directories and jar files
         jna_so = self.studio_dir / "lib" / "jna" / "linux-aarch64" / "libjnidispatch.so"
+        if not jna_so.exists():
+            jna_so = self.studio_dir / "lib" / "jna" / "aarch64" / "libjnidispatch.so"
         if jna_so.exists():
+            for sub in ["linux-aarch64", "aarch64"]:
+                target_dir = self.studio_dir / "lib" / "jna" / sub
+                target_dir.mkdir(parents=True, exist_ok=True)
+                shutil.copy2(jna_so, target_dir / "libjnidispatch.so")
+            
+            prefix_lib = Path(self.termux_prefix) / "lib"
+            if prefix_lib.exists():
+                try:
+                    shutil.copy2(jna_so, prefix_lib / "libjnidispatch.so")
+                except Exception:
+                    pass
+
             for jar_name in ["util.jar", "app.jar", "jna.jar"]:
                 jar_path = self.studio_dir / "lib" / jar_name
                 if jar_path.exists():
@@ -463,6 +477,7 @@ class Installer:
         try:
             with zipfile.ZipFile(jar_path, 'a') as z:
                 z.write(jna_so, arcname="com/sun/jna/linux-aarch64/libjnidispatch.so")
+                z.write(jna_so, arcname="com/sun/jna/aarch64/libjnidispatch.so")
             print_success(f"Injected Bionic libjnidispatch.so directly into {jar_path.name}")
         except Exception as e:
             print_warn(f"Jar injection for {jar_path.name}: {e}")
@@ -595,8 +610,8 @@ unset LD_PRELOAD
 export STUDIO_JDK="{self.selected_jdk}"
 export JAVA_HOME="{self.selected_jdk}"
 export SKIKO_RENDER_API=SOFTWARE_COMPAT
-export _JAVA_OPTIONS="-Djava.io.tmpdir={self.termux_prefix}/tmp -Dskiko.library.path={self.studio_dir}/lib/skiko -Dskiko.renderApi=SOFTWARE_COMPAT ${{_JAVA_OPTIONS:-}}"
-export LD_LIBRARY_PATH="/system/lib64:{self.termux_prefix}/lib:{self.studio_dir}/lib/skiko:{self.studio_dir}/lib/sqlite/linux-aarch64:${{LD_LIBRARY_PATH:-}}"
+export _JAVA_OPTIONS="-Djava.io.tmpdir={self.termux_prefix}/tmp -Dskiko.library.path={self.studio_dir}/lib/skiko -Dskiko.renderApi=SOFTWARE_COMPAT -Djna.boot.library.path={self.studio_dir}/lib/jna/aarch64:{self.studio_dir}/lib/jna/linux-aarch64 ${{_JAVA_OPTIONS:-}}"
+export LD_LIBRARY_PATH="/system/lib64:{self.termux_prefix}/lib:{self.studio_dir}/lib/skiko:{self.studio_dir}/lib/sqlite/linux-aarch64:{self.studio_dir}/lib/jna/aarch64:{self.studio_dir}/lib/jna/linux-aarch64:${{LD_LIBRARY_PATH:-}}"
 
 export ANDROID_HOME="{self.sdk_dir}"
 export ANDROID_SDK_ROOT="{self.sdk_dir}"
