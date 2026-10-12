@@ -427,6 +427,23 @@ class Installer:
             except Exception as e:
                 print_warn(f"Could not copy to {self.termux_prefix}/lib: {e}")
 
+        # Copy libskiko-linux-arm64.so to JDK lib so java.home/lib lookup succeeds unconditionally
+        skiko_so = self.studio_dir / "lib" / "skiko" / "libskiko-linux-arm64.so"
+        if skiko_so.exists():
+            for jdk_cand in [self.selected_jdk, self.studio_dir / "jbr"]:
+                if jdk_cand and (jdk_cand / "lib").exists():
+                    try:
+                        shutil.copy2(skiko_so, jdk_cand / "lib" / "libskiko-linux-arm64.so")
+                        print_success(f"Installed libskiko into {jdk_cand}/lib/libskiko-linux-arm64.so")
+                    except Exception as e:
+                        print_warn(f"Could not copy to {jdk_cand}/lib: {e}")
+
+        # Purge any stale extracted glibc skiko cache
+        skiko_cache = self.home / ".skiko"
+        if skiko_cache.exists():
+            shutil.rmtree(skiko_cache, ignore_errors=True)
+            print_success("Purged stale ~/.skiko cache")
+
         # Inject libjnidispatch.so into jar files
         jna_so = self.studio_dir / "lib" / "jna" / "linux-aarch64" / "libjnidispatch.so"
         if jna_so.exists():
@@ -576,6 +593,8 @@ export GDK_BACKEND=x11
 unset LD_PRELOAD
 export STUDIO_JDK="{self.selected_jdk}"
 export JAVA_HOME="{self.selected_jdk}"
+export _JAVA_OPTIONS="-Djava.io.tmpdir={self.termux_prefix}/tmp -Dskiko.library.path={self.studio_dir}/lib/skiko ${{_JAVA_OPTIONS:-}}"
+export LD_LIBRARY_PATH="/system/lib64:{self.termux_prefix}/lib:{self.studio_dir}/lib/skiko:{self.studio_dir}/lib/sqlite/linux-aarch64:${{LD_LIBRARY_PATH:-}}"
 
 export ANDROID_HOME="{self.sdk_dir}"
 export ANDROID_SDK_ROOT="{self.sdk_dir}"
