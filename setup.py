@@ -521,6 +521,7 @@ export LD_LIBRARY_PATH="/system/lib64:{self.termux_prefix}/lib:{self.studio_dir}
 -Dorg.sqlite.lib.path={self.studio_dir}/lib/sqlite/linux-aarch64
 -Dorg.sqlite.lib.name=libsqlitejdbc.so
 -Dskiko.library.path={self.studio_dir}/lib/skiko
+-Dskiko.renderApi=SOFTWARE_COMPAT
 -Djava.awt.headless=false
 -Dsun.awt.noerasebackground=true
 """
@@ -593,7 +594,8 @@ export GDK_BACKEND=x11
 unset LD_PRELOAD
 export STUDIO_JDK="{self.selected_jdk}"
 export JAVA_HOME="{self.selected_jdk}"
-export _JAVA_OPTIONS="-Djava.io.tmpdir={self.termux_prefix}/tmp -Dskiko.library.path={self.studio_dir}/lib/skiko ${{_JAVA_OPTIONS:-}}"
+export SKIKO_RENDER_API=SOFTWARE_COMPAT
+export _JAVA_OPTIONS="-Djava.io.tmpdir={self.termux_prefix}/tmp -Dskiko.library.path={self.studio_dir}/lib/skiko -Dskiko.renderApi=SOFTWARE_COMPAT ${{_JAVA_OPTIONS:-}}"
 export LD_LIBRARY_PATH="/system/lib64:{self.termux_prefix}/lib:{self.studio_dir}/lib/skiko:{self.studio_dir}/lib/sqlite/linux-aarch64:${{LD_LIBRARY_PATH:-}}"
 
 export ANDROID_HOME="{self.sdk_dir}"
