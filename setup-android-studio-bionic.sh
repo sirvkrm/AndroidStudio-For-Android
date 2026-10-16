@@ -465,6 +465,9 @@ if [ -n "${SELECTED_JDK:-}" ]; then
     export STUDIO_JDK="$SELECTED_JDK"
     export JAVA_HOME="$SELECTED_JDK"
 fi
+export SKIKO_RENDER_API=SOFTWARE_COMPAT
+export _JAVA_OPTIONS="-Djava.io.tmpdir=$PREFIX/tmp -Dskiko.library.path=$ANDROID_STUDIO/lib/skiko -Dskiko.renderApi=SOFTWARE_COMPAT -Djna.boot.library.path=$ANDROID_STUDIO/lib/jna/aarch64:$ANDROID_STUDIO/lib/jna/linux-aarch64 \${_JAVA_OPTIONS:-}"
+export LD_LIBRARY_PATH="/system/lib64:$PREFIX/lib:$ANDROID_STUDIO/lib/skiko:$ANDROID_STUDIO/lib/sqlite/linux-aarch64:$ANDROID_STUDIO/lib/jna/aarch64:$ANDROID_STUDIO/lib/jna/linux-aarch64:\${LD_LIBRARY_PATH:-}"
 
 export ANDROID_HOME="$SDK_ROOT"
 export ANDROID_SDK_ROOT="$SDK_ROOT"
