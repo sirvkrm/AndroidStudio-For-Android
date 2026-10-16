@@ -356,6 +356,7 @@ EOF
   if [[ -f "$vmoptions" ]]; then
     cecho yellow "  ✏ Appending Bionic runtime JVM options to studio64.vmoptions..."
     if [[ "$DRY_RUN" != "yes" ]]; then
+      sed -i 's/-Dsun.java2d.metal=true/-Dsun.java2d.metal=false/g' "$vmoptions" 2>/dev/null || true
       if ! grep -q "jna.boot.library.path" "$vmoptions"; then
         cat << EOF >> "$vmoptions"
 
@@ -369,9 +370,42 @@ EOF
 -Dsun.awt.noerasebackground=true
 EOF
       fi
+      if ! grep -q "studiobot.show.on.first.open" "$vmoptions"; then
+        cat << EOF >> "$vmoptions"
+
+# Disable Auto-opening StudioBot / Gemini Compose ToolWindow to prevent EDT crash
+-Dstudio.bot.enabled=false
+-Dstudiobot.enabled=false
+-Dstudio.flags.studiobot.show.on.first.open=false
+-Dstudio.flags.studiobot.chat.use.compose.for.ui=false
+-Dsun.java2d.metal=false
+-Dsun.java2d.opengl=false
+-Dsun.java2d.xrender=false
+-Dide.browser.jcef.enabled=false
+-Dcompose.swing.render.on.graphics=true
+-Dskiko.renderApi=SOFTWARE_COMPAT
+EOF
+      fi
     fi
     cecho green "  ✅ studio64.vmoptions patched."
   fi
+
+  # 4. Disable heavy Gemini plugin in disabled_plugins.txt
+  cecho yellow "  ✏ Disabling Gemini / StudioBot plugin by default for stability..."
+  if [[ "$DRY_RUN" != "yes" ]]; then
+    local config_root="$HOME/.config/Google"
+    mkdir -p "$config_root/AndroidStudio2026.2.1"
+    for conf in "$config_root"/AndroidStudio*; do
+      if [[ -d "$conf" ]]; then
+        local dis_file="$conf/disabled_plugins.txt"
+        touch "$dis_file"
+        if ! grep -q "com.google.studio.gemini" "$dis_file"; then
+          echo "com.google.studio.gemini" >> "$dis_file"
+        fi
+      fi
+    done
+  fi
+  cecho green "  ✅ Gemini plugin disabled."
 }
 
 ### ================================
@@ -466,7 +500,7 @@ if [ -n "${SELECTED_JDK:-}" ]; then
     export JAVA_HOME="$SELECTED_JDK"
 fi
 export SKIKO_RENDER_API=SOFTWARE_COMPAT
-export _JAVA_OPTIONS="-Djava.io.tmpdir=$PREFIX/tmp -Dskiko.library.path=$ANDROID_STUDIO/lib/skiko -Dskiko.renderApi=SOFTWARE_COMPAT -Djna.boot.library.path=$ANDROID_STUDIO/lib/jna/aarch64:$ANDROID_STUDIO/lib/jna/linux-aarch64 \${_JAVA_OPTIONS:-}"
+export _JAVA_OPTIONS="-Djava.io.tmpdir=$PREFIX/tmp -Dskiko.library.path=$ANDROID_STUDIO/lib/skiko -Dskiko.renderApi=SOFTWARE_COMPAT -Djna.boot.library.path=$ANDROID_STUDIO/lib/jna/aarch64:$ANDROID_STUDIO/lib/jna/linux-aarch64 -Dstudio.bot.enabled=false -Dstudiobot.enabled=false -Dstudio.flags.studiobot.show.on.first.open=false -Dsun.java2d.metal=false -Dcompose.swing.render.on.graphics=true \${_JAVA_OPTIONS:-}"
 export LD_LIBRARY_PATH="/system/lib64:$PREFIX/lib:$ANDROID_STUDIO/lib/skiko:$ANDROID_STUDIO/lib/sqlite/linux-aarch64:$ANDROID_STUDIO/lib/jna/aarch64:$ANDROID_STUDIO/lib/jna/linux-aarch64:\${LD_LIBRARY_PATH:-}"
 
 export ANDROID_HOME="$SDK_ROOT"
