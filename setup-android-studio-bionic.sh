@@ -382,6 +382,10 @@ EOF
 -Dsun.java2d.opengl=false
 -Dsun.java2d.xrender=false
 -Dide.browser.jcef.enabled=false
+-Dide.show.tips.on.startup.default.value=false
+-Dide.show.tips.on.startup=false
+-Dstudio.whats.new.disabled=true
+-Dandroid.whats.new.disabled=true
 -Dcompose.swing.render.on.graphics=true
 -Dskiko.renderApi=SOFTWARE_COMPAT
 EOF
@@ -390,22 +394,36 @@ EOF
     cecho green "  ✅ studio64.vmoptions patched."
   fi
 
-  # 4. Disable heavy Gemini plugin in disabled_plugins.txt
-  cecho yellow "  ✏ Disabling Gemini / StudioBot plugin by default for stability..."
+  # 4. Disable heavy Gemini / StudioBot plugins and Tip of the Day
+  cecho yellow "  ✏ Disabling Gemini / StudioBot plugins and Tip of the Day for stability..."
   if [[ "$DRY_RUN" != "yes" ]]; then
     local config_root="$HOME/.config/Google"
-    mkdir -p "$config_root/AndroidStudio2026.2.1"
+    mkdir -p "$config_root/AndroidStudio2026.2.1/options"
     for conf in "$config_root"/AndroidStudio*; do
       if [[ -d "$conf" ]]; then
         local dis_file="$conf/disabled_plugins.txt"
         touch "$dis_file"
-        if ! grep -q "com.google.studio.gemini" "$dis_file"; then
-          echo "com.google.studio.gemini" >> "$dis_file"
-        fi
+        for p in "com.google.tools.ij.aiplugin" "com.google.studiobot" "com.google.studio.gemini"; do
+          if ! grep -q "$p" "$dis_file"; then
+            echo "$p" >> "$dis_file"
+          fi
+        done
+
+        # Disable Tip of the Day in ide.general.xml
+        local opt_dir="$conf/options"
+        mkdir -p "$opt_dir"
+        local gen_xml="$opt_dir/ide.general.xml"
+        cat << 'XMLEOF' > "$gen_xml"
+<application>
+  <component name="GeneralSettings">
+    <option name="showTipsOnStartup" value="false" />
+  </component>
+</application>
+XMLEOF
       fi
     done
   fi
-  cecho green "  ✅ Gemini plugin disabled."
+  cecho green "  ✅ Startup popup dialogs and AI plugins disabled."
 }
 
 ### ================================
@@ -500,7 +518,7 @@ if [ -n "${SELECTED_JDK:-}" ]; then
     export JAVA_HOME="$SELECTED_JDK"
 fi
 export SKIKO_RENDER_API=SOFTWARE_COMPAT
-export _JAVA_OPTIONS="-Djava.io.tmpdir=$PREFIX/tmp -Dskiko.library.path=$ANDROID_STUDIO/lib/skiko -Dskiko.renderApi=SOFTWARE_COMPAT -Djna.boot.library.path=$ANDROID_STUDIO/lib/jna/aarch64:$ANDROID_STUDIO/lib/jna/linux-aarch64 -Dstudio.bot.enabled=false -Dstudiobot.enabled=false -Dstudio.flags.studiobot.show.on.first.open=false -Dsun.java2d.metal=false -Dcompose.swing.render.on.graphics=true \${_JAVA_OPTIONS:-}"
+export _JAVA_OPTIONS="-Djava.io.tmpdir=$PREFIX/tmp -Dskiko.library.path=$ANDROID_STUDIO/lib/skiko -Dskiko.renderApi=SOFTWARE_COMPAT -Djna.boot.library.path=$ANDROID_STUDIO/lib/jna/aarch64:$ANDROID_STUDIO/lib/jna/linux-aarch64 -Dstudio.bot.enabled=false -Dstudiobot.enabled=false -Dstudio.flags.studiobot.show.on.first.open=false -Dide.show.tips.on.startup.default.value=false -Dide.show.tips.on.startup=false -Dstudio.whats.new.disabled=true -Dsun.java2d.metal=false -Dcompose.swing.render.on.graphics=true \${_JAVA_OPTIONS:-}"
 export LD_LIBRARY_PATH="/system/lib64:$PREFIX/lib:$ANDROID_STUDIO/lib/skiko:$ANDROID_STUDIO/lib/sqlite/linux-aarch64:$ANDROID_STUDIO/lib/jna/aarch64:$ANDROID_STUDIO/lib/jna/linux-aarch64:\${LD_LIBRARY_PATH:-}"
 
 export ANDROID_HOME="$SDK_ROOT"
